@@ -2,21 +2,21 @@
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.5/MicrosoftTeams.schema.json",
   "manifestVersion": "1.5",
   "version": "1.0",
-  "id": "<<YOUR-MICROSOFT-APP-ID>>",
-  "packageName": "com.microsoft.teams.auth",
+  "id": "fd34e7c5-2b46-4ad8-948b-6ac47008e2ca",
+  "packageName": "com.idan.package",
   "developer": {
-    "name": "Microsoft Corp",
-    "websiteUrl": "https://example.azurewebsites.net",
+    "name": "Idan Atias",
+    "websiteUrl": "https://github.com/Kaminario/Felix",
     "privacyUrl": "https://example.azurewebsites.net/privacy",
     "termsOfUseUrl": "https://example.azurewebsites.net/termsofuse"
   },
   "name": {
-    "short": "Teams Auth",
-    "full": "Teams Auth"
+    "short": "Felix",
+    "full": "Felix"
   },
   "description": {
-    "short": "Demonstrates authorization in Teams.",
-    "full": "Demonstrates authorization in Teams."
+    "short": "Felix helps you monitor your cloud resources",
+    "full": "Felix helps you monitor your cloud resources."
   },
   "icons": {
     "outline": "icon-outline.png",
@@ -25,7 +25,7 @@
   "accentColor": "#abcdef",
   "bots": [
     {
-      "botId": "<<YOUR-MICROSOFT-APP-ID>>",
+      "botId": "fd34e7c5-2b46-4ad8-948b-6ac47008e2ca",
       "scopes": [
         "personal"
       ],
