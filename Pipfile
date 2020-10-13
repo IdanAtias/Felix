@@ -8,6 +8,7 @@ verify_ssl = true
 [packages]
 botbuilder-integration-aiohttp = ">=4.10.1"
 botbuilder-dialogs = ">=4.10.1"
+http-noah = {extras = ["async"],version = "==0.1.10"}
 
 [requires]
 python_version = "3.8"
