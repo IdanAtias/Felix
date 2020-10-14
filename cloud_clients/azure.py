@@ -8,16 +8,16 @@ from cloud_models.azure import Subscription, Vm, VmPowerState
 @dataclass
 class Subscriptions:
     client: AsyncHTTPClient
-    path: str = "subscriptions"
+    list_path: str = "subscriptions"
     api_version: str = "2020-01-01"
 
     async def list(self) -> List[Subscription]:
         data = await self.client.get(
-            path=self.path,
+            path=self.list_path,
             query_params={"api-version": self.api_version},
             response_type=dict,
         )
-        return [Subscription(id=sub["id"], name=sub["displayName"]) for sub in data["value"]]
+        return [Subscription(id=sub["subscriptionId"], name=sub["displayName"]) for sub in data["value"]]
 
 
 @dataclass
@@ -35,11 +35,11 @@ class Vms:
         filter func for filtering only vms that match filter conditions
         """
         if next_link:
-            path = next_link
+            path = "/".join(next_link.split("/")[3:])  # omit the scheme and host parts
             query_params = {}
         else:
-            path = self.list_all_path.format({"subscription_id": subscription.id})
-            query_params={"api-version": self.api_version, "statusOnly": "true"}
+            path = self.list_all_path.format(subscription_id=subscription.id)
+            query_params = {"api-version": self.api_version, "statusOnly": "true"}
 
         data = await self.client.get(
             path=path,
@@ -50,7 +50,7 @@ class Vms:
         vms = []
         for vm_data in data["value"]:
             vm = Vm(
-                id=vm_data["id"],
+                id=vm_data["properties"]["vmId"],
                 name=vm_data["name"],
                 power_state=vm_data["properties"]["instanceView"]["statuses"][1]["code"].split("/")[1],
             )
