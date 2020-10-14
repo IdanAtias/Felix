@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from dataclasses import dataclass
 from botbuilder.core import MessageFactory
 from botbuilder.dialogs import (
@@ -13,18 +13,23 @@ from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
 from dialogs import LogoutDialog
 
 from cloud_clients import AzureClient
-from cloud_models.azure import Subscription
+from cloud_models.azure import Subscription, Vm
 
 Index = str  # representing int index as string
 
 
 @dataclass
 class MainDialogData:
-    subscriptions: Dict[Index, Subscription]
+    subscriptions: Dict[Index, Subscription] = None
+    running_vms: List[Vm] = None
 
     @property
     def subscriptions_string(self):
         return " ".join([f"{i}: {s.name}" for i, s in self.subscriptions.items()])
+
+    @property
+    def running_vms_string(self):
+        return " ".join([f"(name: {vm.name}, rg: {vm.rg})" for vm in self.running_vms])
 
 
 class MainDialog(LogoutDialog):
@@ -32,7 +37,7 @@ class MainDialog(LogoutDialog):
         super(MainDialog, self).__init__(MainDialog.__name__, connection_name)
 
         self.azclient = AzureClient()
-        self.data: Optional[MainDialogData] = None
+        self.data = MainDialogData()
 
         # add the dialogs we are going to use
         self.add_dialog(
@@ -68,7 +73,7 @@ class MainDialog(LogoutDialog):
 
         self.azclient.set_auth_token(token)
         subscriptions = dict((str(i + 1), sub) for i, sub in enumerate(await self.azclient.subscriptions.list()))
-        self.data = MainDialogData(subscriptions=subscriptions)
+        self.data.subscriptions = subscriptions
 
     async def get_token_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
         # There is no reason to store the token locally in the bot because we can always just call
@@ -98,6 +103,21 @@ class MainDialog(LogoutDialog):
             await step_context.context.send_activity(f"Can't find such option. Please try again.")
             return await step_context.end_dialog()
 
-        subscription_name = self.data.subscriptions[chosen_subscription_idx].name
-        await step_context.context.send_activity(f"OK! Let's start sniffing around in {subscription_name}...")
+        subscription = self.data.subscriptions[chosen_subscription_idx]
+        await step_context.context.send_activity(f"OK! Let's check for running VMs in {subscription.name}...")
+
+        next_link = None
+        self.data.running_vms = []
+        while True:
+            # aggregate running vms
+            vms, next_link = await self.azclient.vms.list_all_running_vms(
+                subscription=subscription, next_link=next_link
+            )
+            self.data.running_vms += vms
+            if not next_link:
+                # no more vms
+                break
+
+        await step_context.context.send_activity(self.data.running_vms_string)
+
         return await step_context.end_dialog()
