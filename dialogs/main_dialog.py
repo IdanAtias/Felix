@@ -1,6 +1,5 @@
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License.
-
+from typing import Dict
+from dataclasses import dataclass
 from botbuilder.core import MessageFactory
 from botbuilder.dialogs import (
     WaterfallDialog,
@@ -8,13 +7,20 @@ from botbuilder.dialogs import (
     DialogTurnResult,
     PromptOptions,
     NumberPrompt,
-    Choice,
 )
 from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
 
 from dialogs import LogoutDialog
 
 from cloud_clients import AzureClient
+from cloud_models.azure import Subscription
+
+Index = int  # representing an index
+
+
+@dataclass
+class MainDialogData:
+    subscriptions: Dict[Index, Subscription]
 
 
 class MainDialog(LogoutDialog):
