@@ -14,7 +14,7 @@ from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
 
 from dialogs import LogoutDialog
 
-from clients import AzureClient
+from cloud_clients import AzureClient
 
 
 class MainDialog(LogoutDialog):
