@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 from dataclasses import dataclass
 from botbuilder.core import MessageFactory
 from botbuilder.dialogs import (
@@ -22,12 +22,17 @@ Index = int  # representing an index
 class MainDialogData:
     subscriptions: Dict[Index, Subscription]
 
+    @property
+    def subscriptions_string(self):
+        return " ".join([f"{i}: {s.name}" for i, s in self.subscriptions.items()])
+
 
 class MainDialog(LogoutDialog):
     def __init__(self, connection_name: str):
         super(MainDialog, self).__init__(MainDialog.__name__, connection_name)
 
         self.azclient = AzureClient()
+        self.data: Optional[MainDialogData] = None
 
         # add the dialogs we are going to use
         self.add_dialog(
@@ -48,8 +53,8 @@ class MainDialog(LogoutDialog):
             WaterfallDialog(
                 "WFDialog",
                 [
-                    self.prompt_step,
-                    self.verify_login_and_choose_subscription_step,
+                    self.get_token_step,
+                    self.choose_subscription_step,
                     # self.display_token_phase1,
                     # self.display_token_phase2,
                     self.show_chosen_subscription,
@@ -60,21 +65,29 @@ class MainDialog(LogoutDialog):
         # Indicating with what dialog to start
         self.initial_dialog_id = "WFDialog"
 
-    async def prompt_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+    async def _refresh_data(self, token: object):
+        """helper func to refresh all relevant cloud data for the dialog"""
+        if not token:
+            raise ValueError("Can't work with without a valid token!")
+
+        self.azclient.set_auth_token(token)
+        subscriptions = dict((i + 1, sub) for i, sub in enumerate(await self.azclient.subscriptions.list()))
+        self.data = MainDialogData(subscriptions=subscriptions)
+
+    async def get_token_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+        # There is no reason to store the token locally in the bot because we can always just call
+        # the OAuth prompt to get the token or get a new token if needed.
         return await step_context.begin_dialog(OAuthPrompt.__name__)
 
-    async def verify_login_and_choose_subscription_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+    async def choose_subscription_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
         token = step_context.result.token
         if token:
-            self.azclient.set_auth_token(token)
-            subs = await self.azclient.subscriptions.list()
-            num_to_sub = dict((i+1, sub) for i, sub in enumerate(subs))
-            num_to_sub_string = "\n".join([f"{k}: {v}" for k,v in num_to_sub.items()])
-            await step_context.context.send_activity("You are now logged in.")
+            await step_context.context.send_activity("You're in! Let's start...")
+            await self._refresh_data(token)
             return await step_context.prompt(
                 NumberPrompt.__name__,
                 PromptOptions(
-                    prompt=MessageFactory.text(f"Please choose a subscription:\n{num_to_sub_string}"),
+                    prompt=MessageFactory.text(f"Please choose a subscription: {self.data.subscriptions_string}"),
                 )
             )
 
@@ -84,50 +97,11 @@ class MainDialog(LogoutDialog):
         return await step_context.end_dialog()
 
     async def show_chosen_subscription(self, step_context: WaterfallStepContext) -> DialogTurnResult:
-        # it may take a while to get to this step so get the token again
-        # todo reprompt oauth
-        sub = step_context.result
-        await step_context.context.send_activity(f"Let's start sniffing around in {sub}...")
+        chosen_subscription_idx = int(step_context.result)
+        if chosen_subscription_idx not in self.data.subscriptions:
+            await step_context.context.send_activity(f"Can't find such option. Please try again.")
+            return await step_context.end_dialog()
+
+        subscription_name = self.data.subscriptions[chosen_subscription_idx].name
+        await step_context.context.send_activity(f"OK! Let's start sniffing around in {subscription_name}...")
         return await step_context.end_dialog()
-
-        # if step_context.result:
-            # Call the prompt again because we need the token. The reasons for this are:
-            # 1. If the user is already logged in we do not need to store the token locally in the bot and worry
-            #    about refreshing it. We can always just call the prompt again to get the token.
-            # 2. We never know how long it will take a user to respond. By the time the
-            #    user responds the token may have expired. The user would then be prompted to login again.
-            #
-            # There is no reason to store the token locally in the bot because we can always just call
-            # the OAuth prompt to get the token or get a new token if needed.
-            # return await step_context.begin_dialog(OAuthPrompt.__name__)
-
-        # return await step_context.end_dialog()
-
-
-    # async def display_token_phase1(
-    #     self, step_context: WaterfallStepContext
-    # ) -> DialogTurnResult:
-    #     await step_context.context.send_activity("Thank you.")
-    #
-    #     if step_context.result:
-    #         # Call the prompt again because we need the token. The reasons for this are:
-    #         # 1. If the user is already logged in we do not need to store the token locally in the bot and worry
-    #         #    about refreshing it. We can always just call the prompt again to get the token.
-    #         # 2. We never know how long it will take a user to respond. By the time the
-    #         #    user responds the token may have expired. The user would then be prompted to login again.
-    #         #
-    #         # There is no reason to store the token locally in the bot because we can always just call
-    #         # the OAuth prompt to get the token or get a new token if needed.
-    #         return await step_context.begin_dialog(OAuthPrompt.__name__)
-    #
-    #     return await step_context.end_dialog()
-    #
-    # async def display_token_phase2(
-    #     self, step_context: WaterfallStepContext
-    # ) -> DialogTurnResult:
-    #     if step_context.result:
-    #         await step_context.context.send_activity(
-    #             f"Here is your token {step_context.result.token}"
-    #         )
-    #
-    #     return await step_context.end_dialog()
