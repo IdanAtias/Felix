@@ -15,7 +15,7 @@ from dialogs import LogoutDialog
 from cloud_clients import AzureClient
 from cloud_models.azure import Subscription
 
-Index = int  # representing an index
+Index = str  # representing int index as string
 
 
 @dataclass
@@ -67,7 +67,7 @@ class MainDialog(LogoutDialog):
             raise ValueError("Can't work with without a valid token!")
 
         self.azclient.set_auth_token(token)
-        subscriptions = dict((i + 1, sub) for i, sub in enumerate(await self.azclient.subscriptions.list()))
+        subscriptions = dict((str(i + 1), sub) for i, sub in enumerate(await self.azclient.subscriptions.list()))
         self.data = MainDialogData(subscriptions=subscriptions)
 
     async def get_token_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
@@ -93,7 +93,7 @@ class MainDialog(LogoutDialog):
         return await step_context.end_dialog()
 
     async def show_chosen_subscription(self, step_context: WaterfallStepContext) -> DialogTurnResult:
-        chosen_subscription_idx = int(step_context.result)
+        chosen_subscription_idx = str(step_context.result)
         if chosen_subscription_idx not in self.data.subscriptions:
             await step_context.context.send_activity(f"Can't find such option. Please try again.")
             return await step_context.end_dialog()
