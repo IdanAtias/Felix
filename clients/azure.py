@@ -22,7 +22,13 @@ class Subscriptions:
 class Client:
     host: str = "management.azure.com"
     port: int = 443
-    subscriptions: Subscriptions = Subscriptions(AsyncHTTPClient(host=host, port=port, scheme="https", api_base=""))
+    scheme: str = "https"
+    api_base: str = ""
+
+    def __post_init__(self):
+        self.subscriptions = Subscriptions(
+            AsyncHTTPClient(host=self.host, port=self.port, scheme=self.scheme, api_base=self.api_base)
+        )
 
     def set_auth_token(self, token: object):
         self.subscriptions.client.set_auth_token(token=str(token))
