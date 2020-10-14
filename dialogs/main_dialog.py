@@ -46,17 +46,13 @@ class MainDialog(LogoutDialog):
                 ),
             )
         )
-        # self.add_dialog(ConfirmPrompt(ConfirmPrompt.__name__))
         self.add_dialog(NumberPrompt(NumberPrompt.__name__))
-
         self.add_dialog(
             WaterfallDialog(
                 "WFDialog",
                 [
                     self.get_token_step,
                     self.choose_subscription_step,
-                    # self.display_token_phase1,
-                    # self.display_token_phase2,
                     self.show_chosen_subscription,
                 ],
             )
