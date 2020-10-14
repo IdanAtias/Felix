@@ -66,15 +66,6 @@ class MainDialog(LogoutDialog):
         # Indicating with what dialog to start
         self.initial_dialog_id = "WFDialog"
 
-    async def _refresh_data(self, token: object):
-        """helper func to refresh all relevant cloud data for the dialog"""
-        if not token:
-            raise ValueError("Can't work with without a valid token!")
-
-        self.azclient.set_auth_token(token)
-        subscriptions = dict((str(i + 1), sub) for i, sub in enumerate(await self.azclient.subscriptions.list()))
-        self.data.subscriptions = subscriptions
-
     async def get_token_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
         # There is no reason to store the token locally in the bot because we can always just call
         # the OAuth prompt to get the token or get a new token if needed.
@@ -84,7 +75,9 @@ class MainDialog(LogoutDialog):
         token = step_context.result.token
         if token:
             await step_context.context.send_activity("You're in! Let's start...")
-            await self._refresh_data(token)
+            self.azclient.set_auth_token(token)
+            subscriptions = dict((str(i + 1), sub) for i, sub in enumerate(await self.azclient.subscriptions.list()))
+            self.data.subscriptions = subscriptions
             return await step_context.prompt(
                 NumberPrompt.__name__,
                 PromptOptions(
@@ -118,6 +111,10 @@ class MainDialog(LogoutDialog):
                 # no more vms
                 break
 
-        await step_context.context.send_activity(self.data.running_vms_string)
+        if self.data.running_vms:
+            msg = self.data.running_vms_string
+        else:
+            msg = f"Looks like there are no running VMs in {subscription.name}"
+        await step_context.context.send_activity(msg)
 
         return await step_context.end_dialog()
