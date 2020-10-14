@@ -2,6 +2,8 @@ from typing import List
 from dataclasses import dataclass
 from http_noah.async_client import AsyncHTTPClient
 
+from cloud_models.azure import Subscription
+
 
 @dataclass
 class Subscriptions:
@@ -9,13 +11,13 @@ class Subscriptions:
     path: str = "subscriptions"
     api_version: str = "2020-01-01"
 
-    async def list(self) -> List[str]:
+    async def list(self) -> List[Subscription]:
         data = await self.client.get(
             path=self.path,
             query_params={"api-version": self.api_version},
             response_type=dict,
         )
-        return [sub["displayName"] for sub in data["value"]]
+        return [Subscription(id=sub["id"], name=sub["displayName"]) for sub in data["value"]]
 
 
 @dataclass
