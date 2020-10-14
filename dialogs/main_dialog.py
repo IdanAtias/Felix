@@ -25,11 +25,11 @@ class MainDialogData:
 
     @property
     def subscriptions_string(self):
-        return " ".join([f"{i}: {s.name}" for i, s in self.subscriptions.items()])
+        return "\n\n".join([f"{i}: {s.name}" for i, s in self.subscriptions.items()])
 
     @property
     def running_vms_string(self):
-        return " ".join([f"(name: {vm.name}, rg: {vm.rg})" for vm in self.running_vms])
+        return "\n\n".join([f"{i+1}. {vm.name} (rg: {vm.rg})" for i, vm in enumerate(self.running_vms)])
 
 
 class MainDialog(LogoutDialog):
@@ -81,7 +81,7 @@ class MainDialog(LogoutDialog):
             return await step_context.prompt(
                 NumberPrompt.__name__,
                 PromptOptions(
-                    prompt=MessageFactory.text(f"Please choose a subscription: {self.data.subscriptions_string}"),
+                    prompt=MessageFactory.text(f"Please choose a subscription:\n\n{self.data.subscriptions_string}"),
                 )
             )
 
