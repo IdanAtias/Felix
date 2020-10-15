@@ -58,7 +58,7 @@ class MainDialog(LogoutDialog):
                 [
                     self.get_token_step,
                     self.choose_subscription_step,
-                    self.show_chosen_subscription_step,
+                    self.list_running_vms_step,
                 ],
             )
         )
@@ -90,7 +90,7 @@ class MainDialog(LogoutDialog):
         )
         return await step_context.end_dialog()
 
-    async def show_chosen_subscription_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+    async def list_running_vms_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
         chosen_subscription_idx = str(step_context.result)
         if chosen_subscription_idx not in self.data.subscriptions:
             await step_context.context.send_activity(f"Can't find such option. Please try again.")
