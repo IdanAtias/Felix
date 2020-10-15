@@ -1,4 +1,5 @@
-from typing import List, Tuple, Optional, Callable
+import urllib.parse as urlparse
+from typing import List, Tuple, Optional, Callable, Dict
 from dataclasses import dataclass
 from http_noah.async_client import AsyncHTTPClient
 
@@ -35,8 +36,10 @@ class Vms:
         filter func for filtering only vms that match filter conditions
         """
         if next_link:
-            path = "/".join(next_link.split("/")[3:])  # omit the scheme and host parts
-            query_params = {}
+            next_link_parsed = urlparse.urlparse(next_link)
+            path = next_link_parsed.path
+            parsed_query_params: Dict[str, List] = urlparse.parse_qs(next_link_parsed.query)
+            query_params: Dict[str, str] = dict((k, v[0]) for k, v in parsed_query_params.items())  # convert dict style
         else:
             path = self.list_all_path.format(subscription_id=subscription.id)
             query_params = {"api-version": self.api_version, "statusOnly": "true"}
