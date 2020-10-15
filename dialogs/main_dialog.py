@@ -1,4 +1,4 @@
-from typing import Dict, Optional, List
+from typing import List, Optional
 from dataclasses import dataclass
 from botbuilder.core import MessageFactory
 from botbuilder.dialogs import (
@@ -6,7 +6,8 @@ from botbuilder.dialogs import (
     WaterfallStepContext,
     DialogTurnResult,
     PromptOptions,
-    NumberPrompt,
+    Choice,
+    ChoicePrompt,
 )
 from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
 
@@ -15,21 +16,21 @@ from dialogs import LogoutDialog
 from cloud_clients import AzureClient
 from cloud_models.azure import Subscription, Vm
 
-Index = str  # representing int index as string
-
 
 @dataclass
 class MainDialogData:
-    subscriptions: Dict[Index, Subscription] = None
+    subscriptions: List[Subscription] = None
     running_vms: List[Vm] = None
 
     @property
-    def subscriptions_string(self):
-        return "\n\n".join([f"{i}: {s.name}" for i, s in self.subscriptions.items()])
-
-    @property
-    def running_vms_string(self):
+    def running_vms_string(self) -> str:
         return "\n\n".join([f"{i+1}. {vm.name} (rg: {vm.rg})" for i, vm in enumerate(self.running_vms)])
+
+    def get_subscription_by_name(self, name: str) -> Optional[Subscription]:
+        for sub in self.subscriptions:
+            if sub.name == name:
+                return sub
+        return None
 
 
 class MainDialog(LogoutDialog):
@@ -51,7 +52,7 @@ class MainDialog(LogoutDialog):
                 ),
             )
         )
-        self.add_dialog(NumberPrompt(NumberPrompt.__name__))
+        self.add_dialog(ChoicePrompt(ChoicePrompt.__name__))
         self.add_dialog(
             WaterfallDialog(
                 "WFDialog",
@@ -76,12 +77,12 @@ class MainDialog(LogoutDialog):
         if token:
             await step_context.context.send_activity("You're in! Let's start...")
             self.azclient.set_auth_token(token)
-            subscriptions = dict((str(i + 1), sub) for i, sub in enumerate(await self.azclient.subscriptions.list()))
-            self.data.subscriptions = subscriptions
+            self.data.subscriptions = await self.azclient.subscriptions.list()
             return await step_context.prompt(
-                NumberPrompt.__name__,
+                ChoicePrompt.__name__,
                 PromptOptions(
-                    prompt=MessageFactory.text(f"Please choose a subscription:\n\n{self.data.subscriptions_string}"),
+                    prompt=MessageFactory.text("Please choose a subscription"),
+                    choices=[Choice(sub.name) for sub in self.data.subscriptions],
                 )
             )
 
@@ -91,12 +92,12 @@ class MainDialog(LogoutDialog):
         return await step_context.end_dialog()
 
     async def list_running_vms_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
-        chosen_subscription_idx = str(step_context.result)
-        if chosen_subscription_idx not in self.data.subscriptions:
+        chosen_subscription_name = step_context.result.value
+        subscription = self.data.get_subscription_by_name(name=chosen_subscription_name)
+        if not subscription:
             await step_context.context.send_activity(f"Can't find such option. Please try again.")
             return await step_context.end_dialog()
 
-        subscription = self.data.subscriptions[chosen_subscription_idx]
         await step_context.context.send_activity(f"OK! Let's check for running VMs in {subscription.name}...")
 
         next_link = None
