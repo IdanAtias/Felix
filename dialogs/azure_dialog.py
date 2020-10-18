@@ -40,7 +40,6 @@ class AzureDialog(LogoutDialog):
         self.azclient = AzureClient()
         self.data = AzureDialogData()
 
-        # add the dialogs we are going to use
         self.add_dialog(
             OAuthPrompt(
                 OAuthPrompt.__name__,
@@ -55,7 +54,7 @@ class AzureDialog(LogoutDialog):
         self.add_dialog(ChoicePrompt(ChoicePrompt.__name__))
         self.add_dialog(
             WaterfallDialog(
-                "WFDialog",
+                "AzureDialog",
                 [
                     self.get_token_step,
                     self.choose_subscription_step,
@@ -64,8 +63,7 @@ class AzureDialog(LogoutDialog):
             )
         )
 
-        # Indicating with what dialog to start
-        self.initial_dialog_id = "WFDialog"
+        self.initial_dialog_id = "AzureDialog"
 
     async def get_token_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
         # There is no reason to store the token locally in the bot because we can always just call
