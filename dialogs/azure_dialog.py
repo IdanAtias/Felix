@@ -18,7 +18,7 @@ from cloud_models.azure import Subscription, Vm
 
 
 @dataclass
-class MainDialogData:
+class AzureDialogData:
     subscriptions: List[Subscription] = None
     running_vms: List[Vm] = None
 
@@ -33,12 +33,12 @@ class MainDialogData:
         return None
 
 
-class MainDialog(LogoutDialog):
+class AzureDialog(LogoutDialog):
     def __init__(self, connection_name: str):
-        super(MainDialog, self).__init__(MainDialog.__name__, connection_name)
+        super(AzureDialog, self).__init__(AzureDialog.__name__, connection_name)
 
         self.azclient = AzureClient()
-        self.data = MainDialogData()
+        self.data = AzureDialogData()
 
         # add the dialogs we are going to use
         self.add_dialog(

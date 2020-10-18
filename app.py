@@ -23,7 +23,7 @@ from bots import Felix
 
 # Create the loop and Flask app
 from config import DefaultConfig
-from dialogs import MainDialog
+from dialogs import AzureDialog
 
 CONFIG = DefaultConfig()
 
@@ -70,7 +70,7 @@ USER_STATE = UserState(MEMORY)
 CONVERSATION_STATE = ConversationState(MEMORY)
 
 # Create dialog
-DIALOG = MainDialog(CONFIG.AAD_CONNECTION_NAME)
+DIALOG = AzureDialog(CONFIG.AAD_CONNECTION_NAME)
 
 # Create Bot
 BOT = Felix(CONVERSATION_STATE, USER_STATE, DIALOG)

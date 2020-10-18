@@ -1,7 +1,4 @@
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License.
-
 from .logout_dialog import LogoutDialog
-from .main_dialog import MainDialog
+from .azure_dialog import AzureDialog
 
-__all__ = ["LogoutDialog", "MainDialog"]
+__all__ = ["LogoutDialog", "AzureDialog"]
