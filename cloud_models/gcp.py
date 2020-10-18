@@ -6,6 +6,7 @@ class GcpResource(BaseModel):
     id: str
     name: str
     zone: str
+    project: str
 
 
 class InstanceState(str, Enum):

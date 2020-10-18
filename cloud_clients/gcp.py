@@ -11,10 +11,10 @@ class Instances:
     list_all_path: str = "compute/beta/projects/{project}/zones/{zone}/instances"
 
     async def list_all_running_instances(
-            self, project: str, zone: str = "us-central1-c", next_page_token: str = None
+            self, project: str, zone: str, next_page_token: str = None
     ) -> Tuple[List[Instance], Optional[str]]:
         """
-        list all running instances in project (TODO only us-central1-c is currently supported)
+        list all running instances in project
         next page token is for getting the next page of results
         """
         path = self.list_all_path.format(project=project, zone=zone)
@@ -38,7 +38,8 @@ class Instances:
             instance = Instance(
                  id=instance_data["id"],
                  name=instance_data["name"],
-                 zone=instance_data["zone"].split("/")[-1],
+                 zone=zone,
+                 project=project,
                  state=instance_state,
             )
             running_instances.append(instance)
