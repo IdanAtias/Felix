@@ -70,7 +70,7 @@ USER_STATE = UserState(MEMORY)
 CONVERSATION_STATE = ConversationState(MEMORY)
 
 # Create dialog
-DIALOG = MainDialog(CONFIG.CONNECTION_NAME)
+DIALOG = MainDialog(azure_connection_name=CONFIG.AAD_CONNECTION_NAME, gcp_connection_name=CONFIG.GCP_CONNECTION_NAME)
 
 # Create Bot
 BOT = Felix(CONVERSATION_STATE, USER_STATE, DIALOG)

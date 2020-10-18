@@ -13,4 +13,5 @@ class DefaultConfig:
     PORT = 3978
     APP_ID = os.environ["MicrosoftAppId"]
     APP_PASSWORD = os.environ["MicrosoftAppPassword"]
-    CONNECTION_NAME = os.environ["AadConnectionName"]
+    AAD_CONNECTION_NAME = os.environ.get("AadConnectionName")
+    GCP_CONNECTION_NAME = os.environ.get("GcpConnectionName")

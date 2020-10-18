@@ -1,5 +1,3 @@
-from typing import List, Optional
-from dataclasses import dataclass
 from botbuilder.core import MessageFactory
 from botbuilder.dialogs import (
     WaterfallDialog,
@@ -9,113 +7,67 @@ from botbuilder.dialogs import (
     Choice,
     ChoicePrompt,
 )
-from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
+from botbuilder.dialogs import ComponentDialog
 
-from dialogs import LogoutDialog
-
-from cloud_clients import AzureClient
-from cloud_models.azure import Subscription, Vm
-
-
-@dataclass
-class MainDialogData:
-    subscriptions: List[Subscription] = None
-    running_vms: List[Vm] = None
-
-    @property
-    def running_vms_string(self) -> str:
-        return "\n\n".join([f"{i+1}. {vm.name} (rg: {vm.rg})" for i, vm in enumerate(self.running_vms)])
-
-    def get_subscription_by_name(self, name: str) -> Optional[Subscription]:
-        for sub in self.subscriptions:
-            if sub.name == name:
-                return sub
-        return None
+from .azure_dialog import AzureDialog
+from .gcp_dialog import GcpDialog
+from cloud_models import Cloud
 
 
-class MainDialog(LogoutDialog):
-    def __init__(self, connection_name: str):
-        super(MainDialog, self).__init__(MainDialog.__name__, connection_name)
+class MainDialog(ComponentDialog):
+    def __init__(self, azure_connection_name: str = None, gcp_connection_name: str = None):
+        super(MainDialog, self).__init__(MainDialog.__name__)
 
-        self.azclient = AzureClient()
-        self.data = MainDialogData()
+        if not azure_connection_name and not gcp_connection_name:
+            raise ValueError(f"Felix must be provided with at least 1 connection name (GCP/Azure)")
 
-        # add the dialogs we are going to use
-        self.add_dialog(
-            OAuthPrompt(
-                OAuthPrompt.__name__,
-                OAuthPromptSettings(
-                    connection_name=connection_name,
-                    text="Please Sign In",
-                    title="Sign In",
-                    timeout=300000,
-                ),
-            )
-        )
+        self.azure_dialog = None
+        self.gcp_dialog = None
+
+        # add the dialogs
+        if azure_connection_name:
+            self.azure_dialog = AzureDialog(connection_name=azure_connection_name)
+            self.add_dialog(self.azure_dialog)
+
+        if gcp_connection_name:
+            self.gcp_dialog = GcpDialog(connection_name=gcp_connection_name)
+            self.add_dialog(self.gcp_dialog)
+
         self.add_dialog(ChoicePrompt(ChoicePrompt.__name__))
         self.add_dialog(
             WaterfallDialog(
-                "WFDialog",
+                "MainDialog",
                 [
-                    self.get_token_step,
-                    self.choose_subscription_step,
-                    self.list_running_vms_step,
-                ],
+                    self.choose_cloud_step,
+                    self.begin_cloud_dialog_step,
+                ]
             )
         )
 
-        # Indicating with what dialog to start
-        self.initial_dialog_id = "WFDialog"
+        self.initial_dialog_id = "MainDialog" # Indicating with what dialog to start
 
-    async def get_token_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
-        # There is no reason to store the token locally in the bot because we can always just call
-        # the OAuth prompt to get the token or get a new token if needed.
-        return await step_context.begin_dialog(OAuthPrompt.__name__)
+    async def choose_cloud_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+        choices = []
+        if self.azure_dialog:
+            choices.append(Choice(Cloud.azure.value))
+        if self.gcp_dialog:
+            choices.append(Choice(Cloud.gcp.value))
 
-    async def choose_subscription_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
-        token = step_context.result.token
-        if token:
-            await step_context.context.send_activity("You're in! Let's start...")
-            self.azclient.set_auth_token(token)
-            self.data.subscriptions = await self.azclient.subscriptions.list()
-            return await step_context.prompt(
-                ChoicePrompt.__name__,
-                PromptOptions(
-                    prompt=MessageFactory.text("Please choose a subscription"),
-                    choices=[Choice(sub.name) for sub in self.data.subscriptions],
-                )
+        return await step_context.prompt(
+            ChoicePrompt.__name__,
+            PromptOptions(
+                prompt=MessageFactory.text("Please choose the cloud you want me to have a look at"),
+                choices=choices,
             )
-
-        await step_context.context.send_activity(
-            "Login was not successful please try again."
         )
-        return await step_context.end_dialog()
 
-    async def list_running_vms_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
-        chosen_subscription_name = step_context.result.value
-        subscription = self.data.get_subscription_by_name(name=chosen_subscription_name)
-        if not subscription:
-            await step_context.context.send_activity(f"Can't find such option. Please try again.")
-            return await step_context.end_dialog()
+    async def begin_cloud_dialog_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+        cloud = step_context.result.value
 
-        await step_context.context.send_activity(f"OK! Let's check for running VMs in {subscription.name}...")
+        if cloud == Cloud.azure:
+            return await step_context.begin_dialog(self.azure_dialog.id)
 
-        next_link = None
-        self.data.running_vms = []
-        while True:
-            # aggregate running vms
-            vms, next_link = await self.azclient.vms.list_all_running_vms(
-                subscription=subscription, next_link=next_link
-            )
-            self.data.running_vms += vms
-            if not next_link:
-                # no more vms
-                break
+        if cloud == Cloud.gcp:
+            return await step_context.begin_dialog(self.gcp_dialog.id)
 
-        if self.data.running_vms:
-            msg = self.data.running_vms_string
-        else:
-            msg = f"Looks like there are no running VMs in {subscription.name}"
-        await step_context.context.send_activity(msg)
-
-        return await step_context.end_dialog()
+        await step_context.context.send_activity("Sorry, I don't support such cloud. Please try again.")
