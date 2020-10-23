@@ -1,5 +1,6 @@
 from typing import List, Optional
 from dataclasses import dataclass
+from botbuilder.schema import ActivityTypes, Activity
 from botbuilder.core import MessageFactory
 from botbuilder.dialogs import (
     WaterfallDialog,
@@ -11,6 +12,7 @@ from botbuilder.dialogs import (
 )
 from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
 
+from cards import get_azure_vm_card
 from dialogs import LogoutDialog
 
 from cloud_clients import AzureClient
@@ -111,7 +113,10 @@ class AzureDialog(LogoutDialog):
                 break
 
         if self.data.running_vms:
-            msg = self.data.running_vms_string
+            msg = Activity(
+                type=ActivityTypes.message,
+                attachments=[get_azure_vm_card(name=vm.name, rg=vm.rg) for vm in self.data.running_vms],
+            )
         else:
             msg = f"Looks like there are no running VMs in {subscription.name}"
         await step_context.context.send_activity(msg)
