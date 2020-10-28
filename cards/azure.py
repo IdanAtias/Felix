@@ -6,7 +6,7 @@ from botbuilder.schema import Attachment
 
 from cloud_models.azure import Vm
 
-
+AZURE_VMS_CARD_MAX_VMS = 50
 AZURE_VMS_CARD_JSON_TEMPLATE = """
 {
     "type": "AdaptiveCard",
@@ -99,11 +99,11 @@ def _get_vm_rg_dict(rg: str) -> dict:
     return _get_text_block_dict(text=rg)
 
 
-def get_azure_vms_card(vms: List[Vm]) -> Attachment:
+def get_azure_vms_card(vms: List[Vm], start_idx: int) -> Attachment:
     data = json.loads(AZURE_VMS_CARD_JSON_TEMPLATE)
     idx_col, name_col, rg_col = data["body"][1]["columns"]
     for i, vm in enumerate(vms):
-        idx_col["items"].append(_get_vm_idx_dict(idx=i+1))
+        idx_col["items"].append(_get_vm_idx_dict(idx=start_idx+i))
         name_col["items"].append(_get_vm_name_dict(name=vm.name))
         rg_col["items"].append(_get_vm_rg_dict(rg=vm.rg))
     return CardFactory.adaptive_card(card=data)

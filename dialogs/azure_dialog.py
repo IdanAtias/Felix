@@ -13,7 +13,7 @@ from botbuilder.dialogs import (
 )
 from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
 
-from cards import get_azure_vms_card
+from cards import get_azure_vms_card, AZURE_VMS_CARD_MAX_VMS
 from dialogs import LogoutDialog
 
 from cloud_clients import AzureClient
@@ -115,8 +115,10 @@ class AzureDialog(LogoutDialog):
 
         if self.data.running_vms:
             vm_cards = []
-            for i in range(0, len(self.data.running_vms), 20):
-                vm_cards.append(get_azure_vms_card(vms=self.data.running_vms[i:i+20]))
+            for i in range(0, len(self.data.running_vms), AZURE_VMS_CARD_MAX_VMS):
+                vm_cards.append(
+                    get_azure_vms_card(vms=self.data.running_vms[i:i+AZURE_VMS_CARD_MAX_VMS], start_idx=i+1)
+                )
             msg = Activity(
                 type=ActivityTypes.message,
                 attachments=vm_cards,
