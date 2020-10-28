@@ -18,7 +18,7 @@ AZURE_VMS_CARD_JSON_TEMPLATE = """
             "columns": [
                 {
                     "type": "Column",
-                    "width": "stretch",
+                    "width": "10",
                     "items": [
                         {
                             "type": "TextBlock",
@@ -29,7 +29,7 @@ AZURE_VMS_CARD_JSON_TEMPLATE = """
                 },
                 {
                     "type": "Column",
-                    "width": "stretch",
+                    "width": "50",
                     "items": [
                         {
                             "type": "TextBlock",
@@ -41,7 +41,7 @@ AZURE_VMS_CARD_JSON_TEMPLATE = """
                 },
                 {
                     "type": "Column",
-                    "width": "stretch",
+                    "width": "40",
                     "items": [
                         {
                             "type": "TextBlock",
@@ -58,17 +58,17 @@ AZURE_VMS_CARD_JSON_TEMPLATE = """
             "columns": [
                 {
                     "type": "Column",
-                    "width": "stretch",
+                    "width": "10",
                     "items": []
                 },
                 {
                     "type": "Column",
-                    "width": "stretch",
+                    "width": "50",
                     "items": []
                 },
                 {
                     "type": "Column",
-                    "width": "stretch",
+                    "width": "40",
                     "items": []
                 }
             ]
@@ -78,7 +78,7 @@ AZURE_VMS_CARD_JSON_TEMPLATE = """
 """
 
 
-def _get_text_block_dict(text: str, wrap: bool = True, is_subtle: bool = False) -> dict:
+def _get_text_block_dict(text: str, wrap: bool = False, is_subtle: bool = False) -> dict:
     return {
         "type": "TextBlock",
         "text": text,
