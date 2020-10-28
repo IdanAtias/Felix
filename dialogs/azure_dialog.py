@@ -12,7 +12,7 @@ from botbuilder.dialogs import (
 )
 from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
 
-from cards import get_azure_vm_card
+from cards import get_azure_vms_card
 from dialogs import LogoutDialog
 
 from cloud_clients import AzureClient
@@ -115,7 +115,7 @@ class AzureDialog(LogoutDialog):
         if self.data.running_vms:
             msg = Activity(
                 type=ActivityTypes.message,
-                attachments=[get_azure_vm_card(name=vm.name, rg=vm.rg) for vm in self.data.running_vms],
+                attachments=[get_azure_vms_card(vms=self.data.running_vms)],
             )
         else:
             msg = f"Looks like there are no running VMs in {subscription.name}"
