@@ -1,3 +1,4 @@
+import math
 from typing import List, Optional
 from dataclasses import dataclass
 from botbuilder.schema import ActivityTypes, Activity
@@ -113,9 +114,12 @@ class AzureDialog(LogoutDialog):
                 break
 
         if self.data.running_vms:
+            vm_cards = []
+            for i in range(0, len(self.data.running_vms), 20):
+                vm_cards.append(get_azure_vms_card(vms=self.data.running_vms[i:i+20]))
             msg = Activity(
                 type=ActivityTypes.message,
-                attachments=[get_azure_vms_card(vms=self.data.running_vms)],
+                attachments=vm_cards,
             )
         else:
             msg = f"Looks like there are no running VMs in {subscription.name}"
