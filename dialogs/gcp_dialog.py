@@ -16,6 +16,31 @@ from dialogs import LogoutDialog
 from cloud_clients import GcpClient
 from cloud_models.gcp import Instance, Project
 
+US_ZONES_LIST = [
+    'us-central1-a',
+    'us-central1-b',
+    'us-central1-c',
+    'us-central1-f',
+    'us-east1-b',
+    'us-east1-c',
+    'us-east1-d',
+    'us-east4-a',
+    'us-east4-b',
+    'us-east4-c',
+    'us-west1-a',
+    'us-west1-b',
+    'us-west1-c',
+    'us-west2-a',
+    'us-west2-b',
+    'us-west2-c',
+    'us-west3-a',
+    'us-west3-b',
+    'us-west3-c',
+    'us-west4-a',
+    'us-west4-b',
+    'us-west4-c',
+]
+
 
 @dataclass
 class GcpDialogData:
@@ -99,24 +124,27 @@ class GcpDialog(LogoutDialog):
         if not project:
             return await step_context.end_dialog()
 
-        await step_context.context.send_activity(f"OK! Let's check for running instances in {project.name}...")
+        await step_context.context.send_activity(
+            f"OK! Let's check for running instances in {project.name}...(US zones only)"
+        )
 
         next_page_token = None
         self.data.running_instances = []
-        while True:
-            # aggregate running vms
-            instances, next_page_token = await self.gclient.instances.list_running(
-                project=project.id, zone="us-central1-c", next_page_token=next_page_token,
-            )
-            self.data.running_instances += instances
-            if not next_page_token:
-                # no more vms
-                break
+        for zone in US_ZONES_LIST:
+            while True:
+                # aggregate running vms
+                instances, next_page_token = await self.gclient.instances.list_running(
+                    project=project.id, zone=zone, next_page_token=next_page_token,
+                )
+                self.data.running_instances += instances
+                if not next_page_token:
+                    # no more vms
+                    break
 
         if self.data.running_instances:
             msg = self.data.running_instances_string
         else:
-            msg = f"Looks like there are no running instances in {project.name}"
+            msg = f"Looks like there are no running instances in {project.name} (US zones only)"
         await step_context.context.send_activity(msg)
 
         return await step_context.end_dialog()
