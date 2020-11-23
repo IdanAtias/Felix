@@ -2,22 +2,41 @@ from typing import List, Tuple, Optional
 from dataclasses import dataclass
 from http_noah.async_client import AsyncHTTPClient
 
-from cloud_models.gcp import Instance, InstanceState
+from cloud_models.gcp import Instance, InstanceState, Project
+
+
+@dataclass
+class Projects:
+    client: AsyncHTTPClient
+    list_projects_path: str = "v1/projects"
+
+    async def list(self) -> List[Project]:
+        """
+        list all available projects
+        """
+        data = await self.client.get(path=self.list_projects_path, response_type=dict)
+        projects = []
+        for project_data in data.get("projects", []):
+            if project_data["lifecycleState"] != "ACTIVE":
+                # skip not active projects
+                continue
+            projects.append(Project(id=project_data["projectId"], name=project_data["name"]))
+        return projects
 
 
 @dataclass
 class Instances:
     client: AsyncHTTPClient
-    list_all_path: str = "compute/beta/projects/{project}/zones/{zone}/instances"
+    list_instances_path: str = "compute/beta/projects/{project}/zones/{zone}/instances"
 
-    async def list_all_running_instances(
+    async def list_running(
             self, project: str, zone: str, next_page_token: str = None
     ) -> Tuple[List[Instance], Optional[str]]:
         """
         list all running instances in project
         next page token is for getting the next page of results
         """
-        path = self.list_all_path.format(project=project, zone=zone)
+        path = self.list_instances_path.format(project=project, zone=zone)
         query_params = {"filter": f"status = {InstanceState.running}"}
         if next_page_token:
             query_params["pageToken"] = next_page_token
@@ -49,14 +68,23 @@ class Instances:
 
 @dataclass
 class Client:
-    host: str = "compute.googleapis.com"
+    compute_host: str = "compute.googleapis.com"
+    cloud_resource_manager_host: str = "cloudresourcemanager.googleapis.com"
     port: int = 443
     scheme: str = "https"
     api_base: str = ""
 
     def __post_init__(self):
-        self.client = AsyncHTTPClient(host=self.host, port=self.port, scheme=self.scheme, api_base=self.api_base)
-        self.instances = Instances(self.client)
+        self.cloud_resource_manager_client = AsyncHTTPClient(
+            host=self.cloud_resource_manager_host, port=self.port, scheme=self.scheme, api_base=self.api_base
+        )
+        self.compute_client = AsyncHTTPClient(
+            host=self.compute_host, port=self.port, scheme=self.scheme, api_base=self.api_base
+        )
+        self.projects = Projects(self.cloud_resource_manager_client)
+        self.instances = Instances(self.compute_client)
 
     def set_auth_token(self, token: object):
-        self.client.set_auth_token(str(token))
+        token = str(token)
+        self.cloud_resource_manager_client.set_auth_token(token)
+        self.compute_client.set_auth_token(token)

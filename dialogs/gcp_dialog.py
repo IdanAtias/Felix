@@ -1,20 +1,25 @@
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass
+from botbuilder.core import MessageFactory
 from botbuilder.dialogs import (
     WaterfallDialog,
     WaterfallStepContext,
     DialogTurnResult,
+    PromptOptions,
+    Choice,
+    ChoicePrompt,
 )
 from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
 
 from dialogs import LogoutDialog
 
 from cloud_clients import GcpClient
-from cloud_models.gcp import Instance
+from cloud_models.gcp import Instance, Project
 
 
 @dataclass
 class GcpDialogData:
+    projects: List[Project] = None
     running_instances: List[Instance] = None
 
     @property
@@ -25,6 +30,12 @@ class GcpDialogData:
                 for i, instance in enumerate(self.running_instances)
             ]
         )
+
+    def get_project_by_name(self, name: str) -> Optional[Project]:
+        for project in self.projects:
+            if project.name == name:
+                return project
+        return None
 
 
 class GcpDialog(LogoutDialog):
@@ -50,7 +61,8 @@ class GcpDialog(LogoutDialog):
                 "GcpDialog",
                 [
                     self.get_token_step,
-                    self.list_running_vms_step,
+                    self.choose_project_step,
+                    self.list_running_instances_step,
                 ],
             )
         )
@@ -62,7 +74,7 @@ class GcpDialog(LogoutDialog):
         # the OAuth prompt to get the token or get a new token if needed.
         return await step_context.begin_dialog("GcpAuthPrompt")
 
-    async def list_running_vms_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+    async def choose_project_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
         token = step_context.result.token
         if not token:
             await step_context.context.send_activity(
@@ -71,15 +83,30 @@ class GcpDialog(LogoutDialog):
             return await step_context.end_dialog()
 
         self.gclient.set_auth_token(token)
-        await step_context.context.send_activity(f"OK! Let's check for running instances in GCP...")
+        self.data.projects = await self.gclient.projects.list()
+
+        return await step_context.prompt(
+            ChoicePrompt.__name__,
+            PromptOptions(
+                prompt=MessageFactory.text("Please choose a project"),
+                choices=[Choice(project.name) for project in self.data.projects],
+            )
+        )
+
+    async def list_running_instances_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+        project_name = str(step_context.result.value)
+        project: Project = self.data.get_project_by_name(name=project_name)
+        if not project:
+            return await step_context.end_dialog()
+
+        await step_context.context.send_activity(f"OK! Let's check for running instances in {project.name}...")
 
         next_page_token = None
         self.data.running_instances = []
         while True:
             # aggregate running vms
-            instances, next_page_token = await self.gclient.instances.list_all_running_instances(
-                # TODO currently only flex-gcp-kdp and us-central1-c is supported for GCP
-                project="flex-gcp-kdp", zone="us-central1-c", next_page_token=next_page_token,
+            instances, next_page_token = await self.gclient.instances.list_running(
+                project=project.id, zone="us-central1-c", next_page_token=next_page_token,
             )
             self.data.running_instances += instances
             if not next_page_token:
@@ -89,7 +116,7 @@ class GcpDialog(LogoutDialog):
         if self.data.running_instances:
             msg = self.data.running_instances_string
         else:
-            msg = "Looks like there are no running instances in GCP"
+            msg = f"Looks like there are no running instances in {project.name}"
         await step_context.context.send_activity(msg)
 
         return await step_context.end_dialog()

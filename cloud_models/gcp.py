@@ -9,6 +9,11 @@ class GcpResource(BaseModel):
     project: str
 
 
+class Project(GcpResource):
+    zone: str = None
+    project: str = None
+
+
 class InstanceState(str, Enum):
     provisioning = "PROVISIONING"
     staging = "STAGING"
