@@ -16,7 +16,7 @@ from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
 
 from dialogs import LogoutDialog
 
-from cards.gcp import get_gcp_instances_card, GCP_INSTANCES_CARD_MAX_INSTANCES
+from cards import get_gcp_instances_card, GCP_INSTANCES_CARD_MAX_INSTANCES
 from cloud_clients import GcpClient
 from cloud_models.gcp import Instance, Project
 

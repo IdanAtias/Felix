@@ -1,4 +1,3 @@
-import math
 from typing import List, Optional
 from dataclasses import dataclass
 from botbuilder.schema import ActivityTypes, Activity
