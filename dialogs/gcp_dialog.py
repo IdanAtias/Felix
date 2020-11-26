@@ -1,3 +1,5 @@
+import asyncio
+from enum import Enum
 from typing import List, Optional
 from dataclasses import dataclass
 from botbuilder.core import MessageFactory
@@ -42,9 +44,15 @@ US_ZONES_LIST = [
 ]
 
 
+class ChosenProjectType(str, Enum):
+    SPECIFIC = "Specific"
+    ALL = "All"
+
+
 @dataclass
 class GcpDialogData:
     projects: List[Project] = None
+    selected_projects: List[Project] = None
     running_instances: List[Instance] = None
 
     @property
@@ -86,7 +94,8 @@ class GcpDialog(LogoutDialog):
                 "GcpDialog",
                 [
                     self.get_token_step,
-                    self.choose_project_step,
+                    self.choose_all_or_specific_project,
+                    self.choose_specific_project_step,
                     self.list_running_instances_step,
                 ],
             )
@@ -99,7 +108,7 @@ class GcpDialog(LogoutDialog):
         # the OAuth prompt to get the token or get a new token if needed.
         return await step_context.begin_dialog("GcpAuthPrompt")
 
-    async def choose_project_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+    async def choose_all_or_specific_project(self, step_context: WaterfallStepContext) -> DialogTurnResult:
         token = step_context.result.token
         if not token:
             await step_context.context.send_activity(
@@ -108,41 +117,77 @@ class GcpDialog(LogoutDialog):
             return await step_context.end_dialog()
 
         self.gclient.set_auth_token(token)
-        self.data.projects = await self.gclient.projects.list()
 
+        await step_context.context.send_activity("You're in! Let's start..")
         return await step_context.prompt(
             ChoicePrompt.__name__,
             PromptOptions(
-                prompt=MessageFactory.text("Please choose a project"),
+                prompt=MessageFactory.text("Would you like me to check all your GCP projects or a specific one?"),
+                choices=[choice_type.value for choice_type in ChosenProjectType],
+            )
+        )
+
+    async def choose_specific_project_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+        # we need all projects either way (SPECIFIC/ALL)
+        self.data.projects = await self.gclient.projects.list()
+
+        chosen_project_type = str(step_context.result.value)
+        if chosen_project_type == ChosenProjectType.ALL:
+            await step_context.context.send_activity("All projects it is!")
+            return await step_context.next(result=ChosenProjectType.ALL)
+
+        # specific project selection
+        return await step_context.prompt(
+            ChoicePrompt.__name__,
+            PromptOptions(
+                prompt=MessageFactory.text("OK. Which one?"),
                 choices=[Choice(project.name) for project in self.data.projects],
             )
         )
 
-    async def list_running_instances_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
-        project_name = str(step_context.result.value)
-        project: Project = self.data.get_project_by_name(name=project_name)
-        if not project:
-            return await step_context.end_dialog()
-
-        await step_context.context.send_activity(
-            f"OK! Let's check for running instances in {project.name}...(US zones only)"
-        )
-
+    async def _list_running_instances_in_a_single_project_and_zone(self, project: Project, zone: str):
+        running_instances = []
         next_page_token = None
+        while True:
+            # aggregate running instances
+            instances, next_page_token = await self.gclient.instances.list_running(
+                project=project.id, zone=zone, next_page_token=next_page_token,
+            )
+            running_instances += instances
+            if not next_page_token:
+                # no more instances
+                break
+        return running_instances
+
+    async def list_running_instances_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
+        if step_context.result == ChosenProjectType.ALL:
+            self.data.selected_projects = self.data.projects
+            await step_context.context.send_activity(
+                f"OK! Let's check for running instances across all your projects...(US zones only)"
+            )
+        else:
+            project_name = str(step_context.result.value)
+            project: Project = self.data.get_project_by_name(name=project_name)
+            if not project:
+                return await step_context.end_dialog()
+            self.data.selected_projects = [project]
+            await step_context.context.send_activity(
+                f"OK! Let's check for running instances in {project.name}...(US zones only)"
+            )
+
+        tasks = []
+        for project in self.data.selected_projects:
+            for zone in US_ZONES_LIST:
+                tasks.append(self._list_running_instances_in_a_single_project_and_zone(project=project, zone=zone))
+
         self.data.running_instances = []
-        for zone in US_ZONES_LIST:
-            while True:
-                # aggregate running vms
-                instances, next_page_token = await self.gclient.instances.list_running(
-                    project=project.id, zone=zone, next_page_token=next_page_token,
-                )
-                self.data.running_instances += instances
-                if not next_page_token:
-                    # no more vms
-                    break
+        for running_instances in await asyncio.gather(*tasks):
+            self.data.running_instances += running_instances
 
         if self.data.running_instances:
             msg = self.data.running_instances_string
+        elif step_context.result == ChosenProjectType.ALL:
+            msg = f"Looks like there are no running instances in all of your GCP projects (US zones only)"
         else:
             msg = f"Looks like there are no running instances in {project.name} (US zones only)"
         await step_context.context.send_activity(msg)
