@@ -2,16 +2,9 @@ from pydantic import BaseModel
 from enum import Enum
 
 
-class GcpResource(BaseModel):
+class Project(BaseModel):
     id: str
     name: str
-    zone: str
-    project: str
-
-
-class Project(GcpResource):
-    zone: str = None
-    project: str = None
 
 
 class InstanceState(str, Enum):
@@ -24,6 +17,10 @@ class InstanceState(str, Enum):
     suspended = "SUSPENDED"
 
 
-class Instance(GcpResource):
+class Instance(BaseModel):
+    id: str
+    name: str
+    zone: str
+    project: str
     state: InstanceState
 

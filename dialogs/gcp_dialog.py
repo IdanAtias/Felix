@@ -2,6 +2,7 @@ import asyncio
 from enum import Enum
 from typing import List, Optional
 from dataclasses import dataclass
+from botbuilder.schema import ActivityTypes, Activity
 from botbuilder.core import MessageFactory
 from botbuilder.dialogs import (
     WaterfallDialog,
@@ -15,6 +16,7 @@ from botbuilder.dialogs.prompts import OAuthPrompt, OAuthPromptSettings
 
 from dialogs import LogoutDialog
 
+from cards.gcp import get_gcp_instances_card, GCP_INSTANCES_CARD_MAX_INSTANCES
 from cloud_clients import GcpClient
 from cloud_models.gcp import Instance, Project
 
@@ -54,15 +56,6 @@ class GcpDialogData:
     projects: List[Project] = None
     selected_projects: List[Project] = None
     running_instances: List[Instance] = None
-
-    @property
-    def running_instances_string(self) -> str:
-        return "\n\n".join(
-            [
-                f"{i+1}. {instance.name} (project: {instance.project}, zone: {instance.zone})"
-                for i, instance in enumerate(self.running_instances)
-            ]
-        )
 
     def get_project_by_name(self, name: str) -> Optional[Project]:
         for project in self.projects:
@@ -185,7 +178,17 @@ class GcpDialog(LogoutDialog):
             self.data.running_instances += running_instances
 
         if self.data.running_instances:
-            msg = self.data.running_instances_string
+            instance_cards = []
+            for i in range(0, len(self.data.running_instances), GCP_INSTANCES_CARD_MAX_INSTANCES):
+                instance_card = get_gcp_instances_card(
+                    instances=self.data.running_instances[i:i+GCP_INSTANCES_CARD_MAX_INSTANCES],
+                    start_idx=i+1,
+                )
+                instance_cards.append(instance_card)
+            msg = Activity(
+                type=ActivityTypes.message,
+                attachments=instance_cards,
+            )
         elif step_context.result == ChosenProjectType.ALL:
             msg = f"Looks like there are no running instances in all of your GCP projects (US zones only)"
         else:
