@@ -1,3 +1,4 @@
+import structlog
 import asyncio
 from enum import Enum
 from typing import List, Optional
@@ -19,6 +20,8 @@ from dialogs import LogoutDialog
 from cards import get_gcp_instances_card, GCP_INSTANCES_CARD_MAX_INSTANCES
 from cloud_clients import GcpClient
 from cloud_models.gcp import Instance, Project
+
+logger = structlog.get_logger(__name__)
 
 US_ZONES_LIST = [
     'us-central1-a',
@@ -120,9 +123,23 @@ class GcpDialog(LogoutDialog):
             )
         )
 
+    async def _filter_out_projects_without_compute_engine_api(self, projects: List[Project]) -> List[Project]:
+        tasks = []
+        filtered_projects = []
+        for project in projects:
+            tasks.append(self.gclient.projects.validate_compute_engine_api_available(project=project))
+
+        for project in await asyncio.gather(*tasks):
+            if project is not None:
+                filtered_projects.append(project)
+
+        logger.info("Projects with Compute Engine API disabled", projects=set(projects)-set(filtered_projects))
+        return filtered_projects
+
     async def choose_specific_project_step(self, step_context: WaterfallStepContext) -> DialogTurnResult:
         # we need all projects either way (SPECIFIC/ALL)
-        self.data.projects = await self.gclient.projects.list()
+        projects = await self.gclient.projects.list()
+        self.data.projects = await self._filter_out_projects_without_compute_engine_api(projects=projects)
 
         chosen_project_type = str(step_context.result.value)
         if chosen_project_type == ChosenProjectType.ALL:

@@ -1,27 +1,43 @@
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
-from http_noah.async_client import AsyncHTTPClient
-
+from http import HTTPStatus
+from http_noah.async_client import AsyncHTTPClient, HTTPError
 from cloud_models.gcp import Instance, InstanceState, Project
 
 
 @dataclass
 class Projects:
-    client: AsyncHTTPClient
+    resource_manager_client: AsyncHTTPClient
+    compute_client: AsyncHTTPClient
     list_projects_path: str = "v1/projects"
+    filter_compute_engine_enabled_projects_path = "compute/v1/projects/{project}"
 
     async def list(self) -> List[Project]:
         """
         list all available projects
         """
-        data = await self.client.get(path=self.list_projects_path, response_type=dict)
+        data = await self.resource_manager_client.get(path=self.list_projects_path, response_type=dict)
         projects = []
+        filtered_out = []
         for project_data in data.get("projects", []):
             if project_data["lifecycleState"] != "ACTIVE":
                 # skip not active projects
                 continue
             projects.append(Project(id=project_data["projectId"], name=project_data["name"]))
         return projects
+
+    async def validate_compute_engine_api_available(self, project: Project) -> Optional[Project]:
+        """
+        return the project if Compute Engine available else None
+        """
+        try:
+            path = self.filter_compute_engine_enabled_projects_path.format(project=project.id)
+            await self.compute_client.get(path=path, response_type=dict)
+        except HTTPError as e:
+            if e.status == HTTPStatus.FORBIDDEN:
+                return None
+            raise e
+        return project
 
 
 @dataclass
@@ -81,7 +97,10 @@ class Client:
         self.compute_client = AsyncHTTPClient(
             host=self.compute_host, port=self.port, scheme=self.scheme, api_base=self.api_base
         )
-        self.projects = Projects(self.cloud_resource_manager_client)
+        self.projects = Projects(
+            resource_manager_client=self.cloud_resource_manager_client,
+            compute_client=self.compute_client,
+        )
         self.instances = Instances(self.compute_client)
 
     def set_auth_token(self, token: object):
