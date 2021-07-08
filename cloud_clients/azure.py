@@ -52,12 +52,7 @@ class Vms:
 
         vms = []
         for vm_data in data["value"]:
-            vm = Vm(
-                id=vm_data["properties"]["vmId"],
-                name=vm_data["name"],
-                rg=vm_data["id"].split("/")[4],
-                power_state=vm_data["properties"]["instanceView"]["statuses"][1]["code"].split("/")[1],
-            )
+            vm = Vm.from_raw_data(data=vm_data)
             if not filter_func or filter_func(vm):
                 vms.append(vm)
 
