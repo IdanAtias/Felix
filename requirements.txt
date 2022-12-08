@@ -10,7 +10,7 @@ botbuilder-dialogs==4.11.0
 botbuilder-integration-aiohttp==4.11.0
 botbuilder-schema==4.11.0
 botframework-connector==4.11.0
-certifi==2020.12.5
+certifi==2022.12.7
 cffi==1.14.4
 chardet==3.0.4
 cryptography==2.8
